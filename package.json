@@ -1,0 +1,13 @@
+{
+  "name": "bookmarker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @bookmarker/web dev",
+    "dev:ext": "pnpm --filter @bookmarker/extension dev",
+    "build": "pnpm --filter @bookmarker/web build",
+    "build:ext": "pnpm --filter @bookmarker/extension build",
+    "build:all": "pnpm build && pnpm build:ext"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
