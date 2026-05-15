@@ -8,6 +8,5 @@
     "build": "pnpm --filter @bookmarker/web build",
     "build:ext": "pnpm --filter @bookmarker/extension build",
     "build:all": "pnpm build && pnpm build:ext"
-  },
-  "packageManager": "pnpm@9.0.0"
+  }
 }
