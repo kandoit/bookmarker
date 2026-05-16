@@ -98,6 +98,50 @@ Return a JSON object with a "results" array of the top 5 most relevant matches:
   }
 }
 
+export async function suggestWorkspaceBookmarks(
+  workspaceName: string,
+  workspaceDescription: string,
+  bookmarks: Bookmark[],
+  apiKey: string
+): Promise<{ bookmark: Bookmark; reason: string }[]> {
+  if (!bookmarks.length) return []
+  const client = createClient(apiKey)
+
+  const list = bookmarks
+    .map(b => `[${b.id}] "${b.title}" — ${b.url}\n  ${b.description}\n  tags: ${b.tags.join(', ')}`)
+    .join('\n\n')
+
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
+    max_tokens: 1024,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: `You are helping fill a workspace called "${workspaceName}"${workspaceDescription ? ` (${workspaceDescription})` : ''}.
+
+Pick every bookmark from the list below that is clearly relevant to this workspace topic. Be inclusive — if in doubt, include it.
+
+Bookmarks:
+${list}
+
+Return ONLY a JSON object:
+{"results": [{"id": "bookmark-id", "reason": "one short sentence why it belongs"}]}`,
+      },
+    ],
+  })
+
+  try {
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
+    const results: { id: string; reason: string }[] = parsed.results ?? []
+    return results
+      .map(r => ({ bookmark: bookmarks.find(b => b.id === r.id)!, reason: r.reason }))
+      .filter(r => r.bookmark)
+  } catch {
+    return []
+  }
+}
+
 export async function fetchPageContent(url: string): Promise<string | null> {
   try {
     const res = await fetch(`https://r.jina.ai/${url}`, {
