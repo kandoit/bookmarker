@@ -24,6 +24,10 @@ export interface Settings {
   githubBranch: string
   openaiApiKey: string
   webAppUrl: string
+  storageBackend: 'github' | 'gdrive'
+  gdriveClientId: string
+  gdriveAccessToken: string
+  gdriveTokenExpiry: string
 }
 
 export interface BookmarkData {

@@ -1,5 +1,6 @@
 export * from './types'
 export * from './github-storage'
+export * from './gdrive-storage'
 export * from './claude'
 export * from './crud'
 export * from './bookmark-io'

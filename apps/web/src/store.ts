@@ -27,6 +27,10 @@ const defaultSettings: Settings = {
   githubBranch: 'main',
   openaiApiKey: '',
   webAppUrl: '',
+  storageBackend: 'github',
+  gdriveClientId: '',
+  gdriveAccessToken: '',
+  gdriveTokenExpiry: '',
 }
 
 const defaultSync: SyncMeta = {
@@ -68,5 +72,6 @@ export const useStore = create<AppState>()(
 )
 
 export function isConfigured(settings: Settings): boolean {
+  if (settings.storageBackend === 'gdrive') return !!settings.gdriveAccessToken
   return !!(settings.githubToken && settings.githubOwner && settings.githubRepo)
 }

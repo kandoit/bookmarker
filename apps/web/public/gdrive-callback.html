@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Signing in…</title></head>
+<body>
+<script>
+  var hash = window.location.hash.substring(1)
+  var params = Object.fromEntries(new URLSearchParams(hash))
+  if (params.access_token && window.opener) {
+    window.opener.postMessage({ type: 'gdrive-token', access_token: params.access_token, expires_in: params.expires_in }, window.location.origin)
+  } else if (params.error && window.opener) {
+    window.opener.postMessage({ type: 'gdrive-error', error: params.error }, window.location.origin)
+  }
+  window.close()
+</script>
+<p style="font-family:sans-serif;text-align:center;margin-top:40px;color:#666">Signing in… this window should close automatically.</p>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { toast } from 'sonner'
-import { GitHubStorage } from '@bookmarker/shared'
+import { GitHubStorage, GDriveStorage } from '@bookmarker/shared'
 import type { BookmarkData, WorkspaceData } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { logger } from '../logger'
@@ -11,6 +11,9 @@ export function useSync() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const getStorage = useCallback(() => {
+    if (settings.storageBackend === 'gdrive') {
+      return new GDriveStorage(settings.gdriveAccessToken)
+    }
     return new GitHubStorage(
       settings.githubToken,
       settings.githubOwner,
@@ -30,7 +33,7 @@ export function useSync() {
       setSync(meta)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Sync failed'
-      logger.error('GitHub pull failed', msg)
+      logger.error('Storage pull failed', msg)
       setSyncError(msg)
       toast.error(msg)
     } finally {
@@ -71,7 +74,7 @@ export function useSync() {
           if (w) await pushWorkspaces(w)
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Push failed'
-          logger.error('GitHub push failed', msg)
+          logger.error('Storage push failed', msg)
           setSyncError(msg)
           toast.error(msg)
         } finally {
