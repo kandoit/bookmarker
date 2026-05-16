@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { CheckCircle2, XCircle, Loader2, Github, Key, Globe, ScrollText, Download, Clipboard, Trash2, HardDrive } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Github, Key, Globe, ScrollText, Download, Clipboard, Trash2, HardDrive, Smartphone, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { GitHubStorage, GDriveStorage } from '@bookmarker/shared'
 import { useStore, isConfigured } from '../store'
@@ -421,6 +421,9 @@ export default function SettingsPage({ onboarding }: Props) {
           </div>
         </div>
 
+        {/* iOS Share */}
+        {!onboarding && <IOSShareSection appUrl={form.webAppUrl} />}
+
         <button
           onClick={handleSave}
           disabled={!configured}
@@ -433,6 +436,95 @@ export default function SettingsPage({ onboarding }: Props) {
         {!onboarding && (
           <LogsSection logs={logs} onRefresh={refreshLogs} />
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── iOS Share section ─────────────────────────────────────────────────────────
+
+function IOSShareSection({ appUrl }: { appUrl: string }) {
+  const [shortcutOpen, setShortcutOpen] = useState(false)
+
+  const baseUrl = (appUrl.trim() || window.location.origin + window.location.pathname).replace(/\/$/, '')
+  const bookmarklet = `javascript:(function(){window.open('${baseUrl}?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title))})();`
+  const shortcutOpenUrl = `${baseUrl}?url=`
+
+  const copy = async (text: string, label: string) => {
+    await navigator.clipboard.writeText(text)
+    toast.success(`${label} copied`)
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Smartphone size={16} className="text-slate-600 dark:text-slate-400" />
+        <h2 className="font-medium text-slate-900 dark:text-white">Share on iOS</h2>
+      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+        Safari on iOS doesn't support Web Share Target. Use a bookmarklet or iOS Shortcut to send any page to Bookmarker.
+      </p>
+
+      <div className="space-y-4">
+        {/* Bookmarklet */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bookmarklet</span>
+            <button
+              onClick={() => copy(bookmarklet, 'Bookmarklet')}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Clipboard size={12} /> Copy
+            </button>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-3 overflow-x-auto">
+            <code className="text-xs text-slate-600 dark:text-slate-300 break-all whitespace-pre-wrap">{bookmarklet}</code>
+          </div>
+          <ol className="mt-2 space-y-0.5 text-xs text-slate-500 dark:text-slate-400 list-decimal list-inside">
+            <li>In Safari, bookmark any page</li>
+            <li>Open Bookmarks, find it, tap <strong>Edit</strong></li>
+            <li>Replace its URL with the bookmarklet above</li>
+            <li>Tap the bookmark on any page → Bookmarker opens with that URL</li>
+          </ol>
+        </div>
+
+        {/* Shortcut */}
+        <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+          <button
+            onClick={() => setShortcutOpen(o => !o)}
+            className="flex items-center justify-between w-full text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
+            iOS Shortcut <span className="text-xs text-slate-400">(appears in share sheet)</span>
+            <ChevronDown size={15} className={`text-slate-400 transition-transform ${shortcutOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {shortcutOpen && (
+            <div className="mt-3 space-y-3">
+              <ol className="space-y-2 text-xs text-slate-600 dark:text-slate-300 list-decimal list-inside leading-relaxed">
+                <li>Open the <strong>Shortcuts</strong> app → tap <strong>+</strong></li>
+                <li>Tap <strong>Add Action</strong> → search <em>"Receive input"</em> → select it → set type to <strong>URLs</strong></li>
+                <li>Add another action → search <em>"Open URLs"</em> → select it</li>
+                <li>In the URL field, type your app URL then tap the <strong>+</strong> variable button → choose <strong>Shortcut Input</strong></li>
+                <li>Tap the shortcut name at the top → <strong>Share Sheet</strong> → enable <em>"Show in Share Sheet"</em></li>
+                <li>Name it <strong>Add to Bookmarker</strong> and save</li>
+              </ol>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Your app URL (paste in step 4)</span>
+                  <button
+                    onClick={() => copy(shortcutOpenUrl, 'URL')}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Clipboard size={11} /> Copy
+                  </button>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 overflow-x-auto">
+                  <code className="text-xs text-slate-600 dark:text-slate-300 break-all">{shortcutOpenUrl}</code>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
