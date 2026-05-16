@@ -40,19 +40,20 @@ export default function BookmarksPage() {
 
   const clearSearch = () => { setQuery(''); setAiResults(null) }
 
-  const handleSave = (newBookmarks: Bookmark[], workspaceId?: string) => {
+  const handleSave = (newBookmarks: Bookmark[], workspaceIds: string[]) => {
     let bData = { version: 1, updatedAt: '', items: bookmarks }
     for (const b of newBookmarks) bData = addBookmark(bData, b)
 
     let wData = { version: 1, updatedAt: '', items: workspaces }
-    if (workspaceId) {
-      for (const b of newBookmarks) wData = addBookmarkToWorkspace(wData, workspaceId, b.id)
+    for (const wsId of workspaceIds) {
+      for (const b of newBookmarks) wData = addBookmarkToWorkspace(wData, wsId, b.id)
     }
 
     setBookmarks(bData.items)
     setWorkspaces(wData.items)
     schedulePush(bData, wData)
-    toast.success(`${newBookmarks.length} bookmark${newBookmarks.length > 1 ? 's' : ''} saved`)
+    const wsNames = workspaceIds.map(id => workspaces.find(w => w.id === id)?.name).filter(Boolean)
+    toast.success(`${newBookmarks.length} bookmark${newBookmarks.length > 1 ? 's' : ''} saved${wsNames.length ? ` → ${wsNames.join(', ')}` : ''}`)
   }
 
   const handleDelete = (id: string) => {

@@ -155,6 +155,51 @@ export async function fetchPageContent(url: string): Promise<string | null> {
   }
 }
 
+export async function suggestWorkspacesForBookmark(
+  bookmark: Bookmark,
+  workspaces: { id: string; name: string; description: string }[],
+  apiKey: string
+): Promise<string[]> {
+  if (!workspaces.length) return []
+  const client = createClient(apiKey)
+
+  const wsList = workspaces
+    .map(w => `[${w.id}] "${w.name}"${w.description ? ` — ${w.description}` : ''}`)
+    .join('\n')
+
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
+    max_tokens: 256,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: `Which of these workspaces does this bookmark belong to? Only include workspaces that are clearly relevant.
+
+Bookmark:
+Title: "${bookmark.title}"
+URL: ${bookmark.url}
+Description: ${bookmark.description}
+Tags: ${bookmark.tags.join(', ')}
+
+Workspaces:
+${wsList}
+
+Return ONLY matching workspace IDs (empty array if none match):
+{"workspace_ids": ["id1", "id2"]}`,
+      },
+    ],
+  })
+
+  try {
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
+    const ids: string[] = Array.isArray(parsed.workspace_ids) ? parsed.workspace_ids : []
+    return ids.filter(id => workspaces.some(w => w.id === id))
+  } catch {
+    return []
+  }
+}
+
 export async function suggestNewBookmarks(
   bookmarks: Bookmark[],
   apiKey: string
