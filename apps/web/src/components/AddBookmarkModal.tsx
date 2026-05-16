@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X, Loader2, Plus, Sparkles, CheckSquare, Square, ClipboardPaste, ClipboardCheck, Tag } from 'lucide-react'
 import { toast } from 'sonner'
-import { analyzeUrl, createBookmark, getFavicon, suggestWorkspacesForBookmark } from '@bookmarker/shared'
+import { analyzeUrl, createBookmark, getFavicon, suggestWorkspacesForBookmark, fetchPageContent } from '@bookmarker/shared'
 import type { Bookmark, Workspace } from '@bookmarker/shared'
 
 interface Props {
@@ -104,7 +104,8 @@ export default function AddBookmarkModal({
       const results = await Promise.all(
         list.map(async url => {
           if (openaiKey) {
-            const info = await analyzeUrl(url, null, openaiKey)
+            const pageContent = await fetchPageContent(url)
+            const info = await analyzeUrl(url, pageContent, openaiKey)
             return createBookmark({ url, title: info.title || url, description: info.description, tags: info.tags, favicon: getFavicon(url) })
           }
           return createBookmark({ url, title: url, description: '', tags: [], favicon: getFavicon(url) })
