@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { Plus, Search, Sparkles, X, Download, Upload, FileDown, Trash2, Tag } from 'lucide-react'
+import { Plus, Search, Sparkles, X, Download, Upload, FileDown, Trash2, Tag, ChevronDown } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { toast } from 'sonner'
 import {
@@ -32,6 +32,7 @@ export default function BookmarksPage() {
   // Sort + tag filter
   const [sortBy, setSortBy] = useState<SortKey>('newest')
   const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [tagsExpanded, setTagsExpanded] = useState(false)
 
   // Selection
   const [selectMode, setSelectMode] = useState(false)
@@ -356,27 +357,34 @@ export default function BookmarksPage() {
         )}
       </div>
 
-      {/* Tag filter chips — single scrollable row */}
+      {/* Tag filter chips */}
       {allTags.length > 0 && !aiResults && (
-        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5 scrollbar-hide">
-          {activeTag && (
+        <div className="mb-4">
+          <div className={`flex gap-1.5 ${tagsExpanded ? 'flex-wrap' : 'overflow-x-auto scrollbar-hide'}`}>
+            {activeTag && (
+              <button
+                onClick={() => setActiveTag(null)}
+                className="inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-600 text-white"
+              >
+                {activeTag}<X size={10} />
+              </button>
+            )}
+            {allTags.filter(t => t !== activeTag).map(tag => (
+              <button
+                key={tag}
+                onClick={() => setActiveTag(tag)}
+                className="inline-flex shrink-0 items-center px-2.5 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
             <button
-              onClick={() => setActiveTag(null)}
-              className="inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-600 text-white"
+              onClick={() => setTagsExpanded(v => !v)}
+              className="inline-flex shrink-0 items-center gap-0.5 px-2 py-1 rounded-full text-xs text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
-              {activeTag}
-              <X size={10} />
+              <ChevronDown size={12} className={`transition-transform ${tagsExpanded ? 'rotate-180' : ''}`} />
             </button>
-          )}
-          {allTags.filter(t => t !== activeTag).map(tag => (
-            <button
-              key={tag}
-              onClick={() => setActiveTag(tag)}
-              className="inline-flex shrink-0 items-center px-2.5 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
-            >
-              {tag}
-            </button>
-          ))}
+          </div>
         </div>
       )}
 
