@@ -4,6 +4,7 @@ import { streamChat, analyzeUrl, searchBookmarks, fetchPageContent, createBookma
 import type { ChatMessage, Bookmark, AgentTool, StreamEvent } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { useSync } from '../hooks/useSync'
+import { logger } from '../logger'
 import { v4 as uuid } from 'uuid'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -216,10 +217,13 @@ export default function ChatPage() {
 
         // Fetch real page content for accurate title/description/tags
         const pageContent = await fetchPageContent(url)
+        if (!pageContent) logger.warn('Could not fetch page content, falling back to AI knowledge', url)
 
         const info = settings.openaiApiKey
           ? await analyzeUrl(url, pageContent, settings.openaiApiKey)
           : { title: url, description: '', tags: [] }
+
+        logger.info('Bookmark saved via chat', { url, title: info.title })
 
         const bookmark = createBookmark({
           url,
@@ -384,9 +388,11 @@ export default function ChatPage() {
       setChatHistory(prev => [...prev, { id: assistantId, role: 'assistant', content: finalContent }])
 
     } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong'
+      logger.error('AI chat error', msg)
       setMessages(prev => prev.map(m =>
         m.id === assistantId
-          ? { ...m, content: `Error: ${e instanceof Error ? e.message : 'Something went wrong'}` }
+          ? { ...m, content: `Error: ${msg}` }
           : m
       ))
     } finally {
