@@ -1,10 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk'
-import type { Bookmark, AIBookmarkInfo, ChatMessage } from './types'
+import OpenAI from 'openai'
+import type { Bookmark, AIBookmarkInfo, ChatMessage, AgentTool, StreamEvent } from './types'
 
-const MODEL = 'claude-sonnet-4-6'
+const FAST_MODEL = 'gpt-4o-mini'
+const CHAT_MODEL = 'gpt-4o'
 
 export function createClient(apiKey: string) {
-  return new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  return new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 }
 
 export async function analyzeUrl(
@@ -18,9 +19,10 @@ export async function analyzeUrl(
     ? `\nPage content excerpt:\n${pageContent.slice(0, 4000)}`
     : '\n(No page content available — use your training knowledge about this URL.)'
 
-  const msg = await client.messages.create({
-    model: MODEL,
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
     max_tokens: 512,
+    response_format: { type: 'json_object' },
     messages: [
       {
         role: 'user',
@@ -28,7 +30,7 @@ export async function analyzeUrl(
 
 URL: ${url}${contentSection}
 
-Respond with ONLY a JSON object (no markdown):
+Respond with ONLY a JSON object:
 {
   "title": "Page title (concise)",
   "description": "2-3 sentence summary of what this page is and why it's useful",
@@ -39,9 +41,7 @@ Respond with ONLY a JSON object (no markdown):
   })
 
   try {
-    const text = (msg.content[0] as { text: string }).text.trim()
-    const json = text.startsWith('{') ? text : text.match(/\{[\s\S]+\}/)?.[0] ?? '{}'
-    const parsed = JSON.parse(json)
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
     return {
       title: parsed.title ?? '',
       description: parsed.description ?? '',
@@ -64,9 +64,10 @@ export async function searchBookmarks(
     .map(b => `[${b.id}] "${b.title}" - ${b.url}\n  ${b.description}\n  tags: ${b.tags.join(', ')}`)
     .join('\n\n')
 
-  const msg = await client.messages.create({
-    model: MODEL,
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
     max_tokens: 1024,
+    response_format: { type: 'json_object' },
     messages: [
       {
         role: 'user',
@@ -77,18 +78,15 @@ Query: "${query}"
 Available bookmarks:
 ${list}
 
-Return a JSON array of the top 5 most relevant matches (fewer if not enough relevant ones):
-[{"id": "bookmark-id", "reason": "one sentence why this matches"}]
-
-Return ONLY the JSON array, no markdown.`,
+Return a JSON object with a "results" array of the top 5 most relevant matches:
+{"results": [{"id": "bookmark-id", "reason": "one sentence why this matches"}]}`,
       },
     ],
   })
 
   try {
-    const text = (msg.content[0] as { text: string }).text.trim()
-    const json = text.startsWith('[') ? text : text.match(/\[[\s\S]+\]/)?.[0] ?? '[]'
-    const results: { id: string; reason: string }[] = JSON.parse(json)
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
+    const results: { id: string; reason: string }[] = parsed.results ?? []
     return results
       .map(r => ({
         bookmark: bookmarks.find(b => b.id === r.id)!,
@@ -100,41 +98,113 @@ Return ONLY the JSON array, no markdown.`,
   }
 }
 
-export async function* streamChat(
-  messages: ChatMessage[],
-  bookmarks: Bookmark[],
-  apiKey: string
-): AsyncGenerator<string> {
-  const client = createClient(apiKey)
-
+function buildSystemPrompt(bookmarks: Bookmark[]): string {
   const bookmarkList = bookmarks
     .map(b => `[${b.id}] "${b.title}" (${b.url})\n  ${b.description}\n  tags: ${b.tags.join(', ')}`)
     .join('\n\n')
 
-  const systemPrompt = bookmarks.length
-    ? `You are an AI assistant for a personal bookmark manager. Help the user find and manage their bookmarks.
+  return bookmarks.length
+    ? `You are an AI assistant for a personal bookmark manager.
 
-The user has ${bookmarks.length} bookmarks:
+You can search existing bookmarks and add new ones using your tools.
+When a user shares a URL, use add_bookmark to save it automatically — don't just describe it.
+When a user asks to search for bookmarks, use search_bookmarks to find relevant ones and present the results clearly.
+When referencing a saved bookmark in text, write [[BOOKMARK:id]] and the UI renders it as a card.
+Be concise and action-oriented.
 
-${bookmarkList}
+Saved bookmarks (${bookmarks.length}):
+${bookmarkList}`
+    : `You are an AI assistant for a personal bookmark manager. The user has no bookmarks yet.
+When they share a URL, use the add_bookmark tool to save it.`
+}
 
-When referencing a bookmark in your response, include its ID in this format: [[BOOKMARK:id]] — the UI will render it as a card.
-Be concise and helpful.`
-    : `You are an AI assistant for a personal bookmark manager. The user has no bookmarks yet. Encourage them to add some.`
+export async function* streamChat(
+  bookmarks: Bookmark[],
+  messages: ChatMessage[],
+  apiKey: string,
+  tools: AgentTool[] = []
+): AsyncGenerator<StreamEvent> {
+  const client = createClient(apiKey)
 
-  const stream = client.messages.stream({
-    model: MODEL,
-    max_tokens: 2048,
-    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-    messages: messages.map(m => ({ role: m.role, content: m.content })),
-  })
+  const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: 'system', content: buildSystemPrompt(bookmarks) },
+    ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+  ]
 
-  for await (const event of stream) {
-    if (
-      event.type === 'content_block_delta' &&
-      event.delta.type === 'text_delta'
-    ) {
-      yield event.delta.text
+  const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map(t => ({
+    type: 'function' as const,
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }))
+
+  // Agentic loop — keeps running until no more tool calls
+  while (true) {
+    const stream = await client.chat.completions.create({
+      model: CHAT_MODEL,
+      max_tokens: 2048,
+      stream: true,
+      messages: openaiMessages,
+      ...(openaiTools.length > 0 && { tools: openaiTools, tool_choice: 'auto' }),
+    })
+
+    // Accumulate streamed response
+    const pending: Record<number, { id: string; name: string; args: string }> = {}
+    let assistantText = ''
+    let finishReason = ''
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta
+      finishReason = chunk.choices[0]?.finish_reason ?? finishReason
+
+      if (delta?.content) {
+        assistantText += delta.content
+        yield { type: 'text', text: delta.content }
+      }
+
+      for (const tc of delta?.tool_calls ?? []) {
+        if (!pending[tc.index]) {
+          pending[tc.index] = { id: tc.id ?? '', name: tc.function?.name ?? '', args: '' }
+        }
+        if (tc.id) pending[tc.index].id = tc.id
+        if (tc.function?.name) pending[tc.index].name = tc.function.name
+        pending[tc.index].args += tc.function?.arguments ?? ''
+      }
     }
+
+    // Record assistant turn
+    const toolCalls = Object.values(pending)
+    openaiMessages.push({
+      role: 'assistant',
+      content: assistantText || null,
+      ...(toolCalls.length > 0 && {
+        tool_calls: toolCalls.map(tc => ({
+          id: tc.id,
+          type: 'function' as const,
+          function: { name: tc.name, arguments: tc.args },
+        })),
+      }),
+    })
+
+    if (finishReason !== 'tool_calls' || toolCalls.length === 0) break
+
+    // Execute each tool call
+    for (const tc of toolCalls) {
+      let args: Record<string, unknown> = {}
+      try { args = JSON.parse(tc.args) } catch { /* invalid JSON */ }
+
+      yield { type: 'tool_start', name: tc.name, args }
+
+      const tool = tools.find(t => t.name === tc.name)
+      let result = 'Tool not found'
+      if (tool) {
+        try { result = await tool.execute(args) } catch (e) {
+          result = `Error: ${e instanceof Error ? e.message : 'unknown'}`
+        }
+      }
+
+      yield { type: 'tool_done', name: tc.name, result }
+
+      openaiMessages.push({ role: 'tool', tool_call_id: tc.id, content: result })
+    }
+    // Continue loop so the agent can respond after tool execution
   }
 }

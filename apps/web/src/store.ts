@@ -25,7 +25,7 @@ const defaultSettings: Settings = {
   githubOwner: '',
   githubRepo: '',
   githubBranch: 'main',
-  anthropicApiKey: '',
+  openaiApiKey: '',
   webAppUrl: '',
 }
 

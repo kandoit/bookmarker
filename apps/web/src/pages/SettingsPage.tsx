@@ -182,7 +182,7 @@ export default function SettingsPage({ onboarding }: Props) {
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
             Enables AI-powered summaries, tags, and chat.{' '}
             <a
-              href="https://console.anthropic.com/settings/keys"
+              href="https://platform.openai.com/api-keys"
               target="_blank"
               rel="noopener noreferrer"
               className="text-violet-600 dark:text-violet-400 hover:underline"
@@ -191,12 +191,12 @@ export default function SettingsPage({ onboarding }: Props) {
             </a>
           </p>
           <div>
-            <label className={labelCls}>Anthropic API Key</label>
+            <label className={labelCls}>OpenAI API Key</label>
             <input
               type="password"
-              value={form.anthropicApiKey}
-              onChange={e => update('anthropicApiKey', e.target.value)}
-              placeholder="sk-ant-xxxxxxxxxxxxxxxxxxxx"
+              value={form.openaiApiKey}
+              onChange={e => update('openaiApiKey', e.target.value)}
+              placeholder="sk-..."
               className={inputCls}
             />
           </div>

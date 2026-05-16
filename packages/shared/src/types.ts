@@ -22,7 +22,7 @@ export interface Settings {
   githubOwner: string
   githubRepo: string
   githubBranch: string
-  anthropicApiKey: string
+  openaiApiKey: string
   webAppUrl: string
 }
 
@@ -58,3 +58,19 @@ export interface ChatMessage {
   content: string
   bookmarkRefs?: string[]
 }
+
+export interface AgentTool {
+  name: string
+  description: string
+  parameters: {
+    type: 'object'
+    properties: Record<string, { type: string; description: string }>
+    required?: string[]
+  }
+  execute: (args: Record<string, unknown>) => Promise<string>
+}
+
+export type StreamEvent =
+  | { type: 'text'; text: string }
+  | { type: 'tool_start'; name: string; args: Record<string, unknown> }
+  | { type: 'tool_done'; name: string; result: string }
