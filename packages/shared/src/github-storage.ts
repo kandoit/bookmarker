@@ -40,20 +40,37 @@ export class GitHubStorage {
     return { content, sha: data.sha }
   }
 
-  private async writeFile(path: string, content: string, message: string, sha?: string) {
-    const encoded = btoa(
+  private encode(content: string) {
+    return btoa(
       encodeURIComponent(content).replace(/%([0-9A-F]{2})/g, (_, p1) =>
         String.fromCharCode(parseInt(p1, 16))
       )
     )
-    const body: Record<string, unknown> = { message, content: encoded, branch: this.branch }
-    if (sha) body.sha = sha
+  }
 
-    const res = await fetch(`${API}/repos/${this.owner}/${this.repo}/contents/${path}`, {
-      method: 'PUT',
-      headers: this.headers,
-      body: JSON.stringify(body),
-    })
+  private async writeFile(path: string, content: string, message: string, sha?: string): Promise<string> {
+    const attempt = async (fileSha?: string) => {
+      const body: Record<string, unknown> = {
+        message,
+        content: this.encode(content),
+        branch: this.branch,
+      }
+      if (fileSha) body.sha = fileSha
+      return fetch(`${API}/repos/${this.owner}/${this.repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: this.headers,
+        body: JSON.stringify(body),
+      })
+    }
+
+    let res = await attempt(sha || undefined)
+
+    // SHA mismatch — re-fetch current SHA and retry once
+    if (res.status === 409) {
+      const current = await this.readFile(path)
+      res = await attempt(current?.sha)
+    }
+
     if (!res.ok) throw new Error(`GitHub write failed: ${res.status} ${await res.text()}`)
     const data = await res.json()
     return data.content.sha as string
