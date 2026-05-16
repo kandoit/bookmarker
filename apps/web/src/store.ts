@@ -67,6 +67,17 @@ export const useStore = create<AppState>()(
         sync: state.sync,
         darkMode: state.darkMode,
       }),
+      // Deep-merge settings so new fields added to defaultSettings are preserved
+      // when loading an older persisted store that doesn't have them yet.
+      merge: (persisted, current) => {
+        const p = persisted as Partial<AppState>
+        return {
+          ...current,
+          ...p,
+          settings: { ...current.settings, ...(p.settings ?? {}) },
+          sync: { ...current.sync, ...(p.sync ?? {}) },
+        }
+      },
     }
   )
 )
