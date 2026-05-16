@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, Github, Key, Globe } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { CheckCircle2, XCircle, Loader2, Github, Key, Globe, ScrollText, Download, Clipboard, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { GitHubStorage } from '@bookmarker/shared'
 import { useStore, isConfigured } from '../store'
 import { useSync } from '../hooks/useSync'
+import { logger } from '../logger'
+import type { LogEntry } from '../logger'
 
 interface Props {
   onboarding?: boolean
@@ -17,6 +19,10 @@ export default function SettingsPage({ onboarding }: Props) {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<'ok' | 'error' | null>(null)
   const [initing, setIniting] = useState(false)
+  const [logs, setLogs] = useState<LogEntry[]>([])
+
+  const refreshLogs = useCallback(() => setLogs(logger.getLogs()), [])
+  useEffect(() => { refreshLogs() }, [])
 
   const update = (k: keyof typeof form, v: string) => {
     setForm(f => ({ ...f, [k]: v }))
@@ -76,7 +82,7 @@ export default function SettingsPage({ onboarding }: Props) {
   const labelCls = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5"
 
   return (
-    <div className={onboarding ? '' : 'p-4 sm:p-6 max-w-2xl mx-auto'}>
+    <div className={onboarding ? '' : 'p-6 max-w-2xl mx-auto'}>
       {!onboarding && (
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Settings</h1>
@@ -172,7 +178,7 @@ export default function SettingsPage({ onboarding }: Props) {
           </div>
         </div>
 
-        {/* OpenAI */}
+        {/* Anthropic */}
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Key size={16} className="text-slate-600 dark:text-slate-400" />
@@ -196,7 +202,7 @@ export default function SettingsPage({ onboarding }: Props) {
               type="password"
               value={form.openaiApiKey}
               onChange={e => update('openaiApiKey', e.target.value)}
-              placeholder="sk-xxxxxxxxxxxxxxxxxxxx"
+              placeholder="sk-..."
               className={inputCls}
             />
           </div>
@@ -227,7 +233,116 @@ export default function SettingsPage({ onboarding }: Props) {
         >
           {onboarding ? 'Save & get started' : 'Save settings'}
         </button>
+
+        {/* Logs */}
+        {!onboarding && (
+          <LogsSection logs={logs} onRefresh={refreshLogs} />
+        )}
       </div>
+    </div>
+  )
+}
+
+// ── Logs section ──────────────────────────────────────────────────────────────
+
+function LogsSection({ logs, onRefresh }: { logs: LogEntry[]; onRefresh: () => void }) {
+  const errorCount = logs.filter(e => e.level === 'error').length
+
+  const formatLogs = () =>
+    logs.map(e => {
+      const line = `[${e.ts}] [${e.level.toUpperCase()}] ${e.msg}`
+      return e.detail ? `${line}\n  ${e.detail.replace(/\n/g, '\n  ')}` : line
+    }).join('\n')
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(formatLogs())
+    toast.success('Logs copied to clipboard')
+  }
+
+  const handleDownload = () => {
+    const blob = new Blob([formatLogs()], { type: 'text/plain' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `bookmarker-logs-${new Date().toISOString().slice(0, 10)}.txt`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  const handleClear = () => {
+    logger.clear()
+    onRefresh()
+    toast.success('Logs cleared')
+  }
+
+  const levelColor = (level: LogEntry['level']) => {
+    if (level === 'error') return 'text-red-500 dark:text-red-400'
+    if (level === 'warn')  return 'text-amber-500 dark:text-amber-400'
+    return 'text-slate-400 dark:text-slate-500'
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <ScrollText size={16} className="text-slate-600 dark:text-slate-400" />
+          <h2 className="font-medium text-slate-900 dark:text-white">Logs</h2>
+          {errorCount > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400">
+              {errorCount} error{errorCount > 1 ? 's' : ''}
+            </span>
+          )}
+          <span className="text-xs text-slate-400 dark:text-slate-500">{logs.length} entries</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleCopy}
+            disabled={!logs.length}
+            title="Copy to clipboard"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+          >
+            <Clipboard size={14} />
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={!logs.length}
+            title="Download as .txt"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+          >
+            <Download size={14} />
+          </button>
+          <button
+            onClick={handleClear}
+            disabled={!logs.length}
+            title="Clear logs"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      {logs.length === 0 ? (
+        <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-6">No logs yet</p>
+      ) : (
+        <div className="bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-72 p-3 space-y-2 font-mono">
+          {[...logs].reverse().map((entry, i) => (
+            <div key={i} className="text-xs leading-relaxed">
+              <span className="text-slate-400 dark:text-slate-600 select-none">
+                {new Date(entry.ts).toLocaleTimeString()} {' '}
+              </span>
+              <span className={`font-semibold uppercase ${levelColor(entry.level)}`}>
+                [{entry.level}]{' '}
+              </span>
+              <span className="text-slate-700 dark:text-slate-300">{entry.msg}</span>
+              {entry.detail && (
+                <pre className="mt-0.5 ml-4 text-slate-500 dark:text-slate-500 whitespace-pre-wrap break-all">
+                  {entry.detail}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

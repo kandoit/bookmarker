@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { GitHubStorage } from '@bookmarker/shared'
 import type { BookmarkData, WorkspaceData } from '@bookmarker/shared'
 import { useStore } from '../store'
+import { logger } from '../logger'
 
 export function useSync() {
   const { settings, sync, setBookmarks, setWorkspaces, setSync, setSyncing, setSyncError } = useStore()
@@ -29,6 +30,7 @@ export function useSync() {
       setSync(meta)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Sync failed'
+      logger.error('GitHub pull failed', msg)
       setSyncError(msg)
       toast.error(msg)
     } finally {
@@ -69,6 +71,7 @@ export function useSync() {
           if (w) await pushWorkspaces(w)
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Push failed'
+          logger.error('GitHub push failed', msg)
           setSyncError(msg)
           toast.error(msg)
         } finally {
