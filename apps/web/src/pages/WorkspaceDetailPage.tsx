@@ -24,7 +24,7 @@ export default function WorkspaceDetailPage() {
 
   const workspace = workspaces.find(w => w.id === id)
   if (!workspace) return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <p className="text-slate-500">Workspace not found.</p>
       <Link to="/workspaces" className="text-violet-600 text-sm mt-2 inline-block">← Back</Link>
     </div>
@@ -71,7 +71,7 @@ export default function WorkspaceDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <Link
           to="/workspaces"

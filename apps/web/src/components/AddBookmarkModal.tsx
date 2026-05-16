@@ -67,7 +67,7 @@ export default function AddBookmarkModal({ open, onClose, workspaces, openaiKey,
     <Dialog.Root open={open} onOpenChange={v => !v && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl z-50 p-6 max-h-[85vh] flex flex-col">
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white dark:bg-slate-900 rounded-t-2xl shadow-2xl max-h-[90dvh] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg sm:rounded-2xl sm:max-h-[85vh] p-5 sm:p-6">
           <div className="flex items-center justify-between mb-5">
             <Dialog.Title className="text-lg font-semibold text-slate-900 dark:text-white">
               Add Bookmarks

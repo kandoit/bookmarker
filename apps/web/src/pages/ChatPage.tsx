@@ -111,7 +111,7 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-2">
           <Sparkles size={18} className="text-violet-600 dark:text-violet-400" />
           <h1 className="font-semibold text-slate-900 dark:text-white">AI Chat</h1>
@@ -122,7 +122,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-slate-400 dark:text-slate-500 mt-20">
             <Sparkles size={32} className="mx-auto mb-3 opacity-40" />
@@ -150,7 +150,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="shrink-0 px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="flex items-end gap-3">
           <textarea
             ref={inputRef}

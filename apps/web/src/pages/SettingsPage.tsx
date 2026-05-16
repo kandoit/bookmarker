@@ -76,7 +76,7 @@ export default function SettingsPage({ onboarding }: Props) {
   const labelCls = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5"
 
   return (
-    <div className={onboarding ? '' : 'p-6 max-w-2xl mx-auto'}>
+    <div className={onboarding ? '' : 'p-4 sm:p-6 max-w-2xl mx-auto'}>
       {!onboarding && (
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Settings</h1>
