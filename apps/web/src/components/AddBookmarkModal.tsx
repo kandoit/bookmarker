@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { X, Loader2, Plus, Sparkles, CheckSquare, Square } from 'lucide-react'
+import { X, Loader2, Plus, Sparkles, CheckSquare, Square, ClipboardPaste } from 'lucide-react'
 import { toast } from 'sonner'
 import { analyzeUrl, createBookmark, getFavicon, suggestWorkspacesForBookmark } from '@bookmarker/shared'
 import type { Bookmark, Workspace } from '@bookmarker/shared'
@@ -27,17 +27,34 @@ export default function AddBookmarkModal({
   )
   const [suggestingWs, setSuggestingWs] = useState(false)
   const [wsSuggested, setWsSuggested] = useState(false)
+  const [fromClipboard, setFromClipboard] = useState(false)
 
   useEffect(() => {
-    if (open && initialUrl && !autoAnalyzed.current) {
+    if (!open) { autoAnalyzed.current = false; return }
+    if (autoAnalyzed.current) return
+
+    if (initialUrl) {
       autoAnalyzed.current = true
       setUrls(initialUrl)
       setPreviews([])
       setWsSuggested(false)
-      // kick off analysis after state has settled
+      setFromClipboard(false)
       setTimeout(() => handleAnalyzeUrl(initialUrl), 0)
+      return
     }
-    if (!open) autoAnalyzed.current = false
+
+    // Try clipboard for a URL
+    navigator.clipboard.readText().then(text => {
+      const trimmed = text.trim()
+      if (/^https?:\/\//i.test(trimmed) && !autoAnalyzed.current) {
+        autoAnalyzed.current = true
+        setUrls(trimmed)
+        setPreviews([])
+        setWsSuggested(false)
+        setFromClipboard(true)
+        setTimeout(() => handleAnalyzeUrl(trimmed), 0)
+      }
+    }).catch(() => { /* clipboard permission denied — silent */ })
   }, [open, initialUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
@@ -45,6 +62,7 @@ export default function AddBookmarkModal({
     setPreviews([])
     setSelectedWsIds(new Set(defaultWorkspaceId ? [defaultWorkspaceId] : []))
     setWsSuggested(false)
+    setFromClipboard(false)
   }
 
   const handleAnalyzeUrl = async (urlOverride?: string) => {
@@ -120,12 +138,19 @@ export default function AddBookmarkModal({
           <div className="flex-1 overflow-y-auto space-y-4">
             {/* URL input */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                URLs <span className="text-slate-400 font-normal">(one per line)</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  URLs <span className="text-slate-400 font-normal">(one per line)</span>
+                </label>
+                {fromClipboard && (
+                  <span className="flex items-center gap-1 text-xs text-violet-500 dark:text-violet-400">
+                    <ClipboardPaste size={12} /> Pasted from clipboard
+                  </span>
+                )}
+              </div>
               <textarea
                 value={urls}
-                onChange={e => { setUrls(e.target.value); setPreviews([]); setWsSuggested(false) }}
+                onChange={e => { setUrls(e.target.value); setPreviews([]); setWsSuggested(false); setFromClipboard(false) }}
                 placeholder="https://example.com&#10;https://another.com"
                 rows={4}
                 className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
