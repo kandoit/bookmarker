@@ -499,18 +499,39 @@ function IOSShareSection({ appUrl }: { appUrl: string }) {
           </button>
 
           {shortcutOpen && (
-            <div className="mt-3 space-y-3">
-              <ol className="space-y-2 text-xs text-slate-600 dark:text-slate-300 list-decimal list-inside leading-relaxed">
-                <li>Open the <strong>Shortcuts</strong> app → tap <strong>+</strong></li>
-                <li>Tap <strong>Add Action</strong> → search <em>"Receive input"</em> → select it → set type to <strong>URLs</strong></li>
-                <li>Add another action → search <em>"Open URLs"</em> → select it</li>
-                <li>In the URL field, type your app URL then tap the <strong>+</strong> variable button → choose <strong>Shortcut Input</strong></li>
-                <li>Tap the shortcut name at the top → <strong>Share Sheet</strong> → enable <em>"Show in Share Sheet"</em></li>
-                <li>Name it <strong>Add to Bookmarker</strong> and save</li>
-              </ol>
+            <div className="mt-3 space-y-4">
+              {/* Step-by-step */}
+              <div className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <div className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center justify-center">1</span>
+                  <span>Open <strong>Shortcuts</strong> app → tap <strong>+</strong> (top right)</span>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center justify-center">2</span>
+                  <span>Tap <strong>Add Action</strong> → search <em>Text</em> → select <strong>Text</strong>. In the text box, paste your app trigger URL (below). This builds the full URL with the shared link appended.</span>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center justify-center">3</span>
+                  <span>With the cursor at the <strong>end</strong> of the text, tap the <strong>variable button</strong> (looks like <em>{'{x}'}</em>) → choose <strong>Shortcut Input</strong>. The box should now read: <em>{shortcutOpenUrl}<strong>[Shortcut Input]</strong></em></span>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center justify-center">4</span>
+                  <span>Add another action → search <em>Open URLs</em> → select <strong>Open URLs</strong>. Tap its URL field → tap the variable button → choose <strong>Text</strong> (the result from step 2–3).</span>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center justify-center">5</span>
+                  <span>Tap the shortcut <strong>name</strong> at the top → <strong>Add to Home Screen</strong> (optional) and also tap <strong>Share Sheet</strong> → turn on <em>"Use as Quick Action"</em> and set input to <strong>URLs</strong>.</span>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center justify-center">6</span>
+                  <span>Name it <strong>Add to Bookmarker</strong> and tap <strong>Done</strong>. Now share any page → tap the shortcut → Bookmarker opens with AI ready to analyze.</span>
+                </div>
+              </div>
+
+              {/* Trigger URL to copy */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Your app URL (paste in step 4)</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Trigger URL — paste into the Text action (step 2)</span>
                   <button
                     onClick={() => copy(shortcutOpenUrl, 'URL')}
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
