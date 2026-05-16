@@ -46,7 +46,7 @@ export default function BookmarksPage() {
   const allTags = useMemo(() => {
     const counts = new Map<string, number>()
     bookmarks.forEach(b => b.tags.forEach(t => counts.set(t, (counts.get(t) ?? 0) + 1)))
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([tag]) => tag)
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([tag]) => tag)
   }, [bookmarks])
 
   const displayed = useMemo(() => {
@@ -356,15 +356,14 @@ export default function BookmarksPage() {
         )}
       </div>
 
-      {/* Tag filter chips */}
+      {/* Tag filter chips — single scrollable row */}
       {allTags.length > 0 && !aiResults && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5 scrollbar-hide">
           {activeTag && (
             <button
               onClick={() => setActiveTag(null)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-violet-600 text-white"
+              className="inline-flex shrink-0 items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-600 text-white"
             >
-              <Tag size={10} />
               {activeTag}
               <X size={10} />
             </button>
@@ -373,9 +372,8 @@ export default function BookmarksPage() {
             <button
               key={tag}
               onClick={() => setActiveTag(tag)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+              className="inline-flex shrink-0 items-center px-2.5 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
             >
-              <Tag size={10} />
               {tag}
             </button>
           ))}
