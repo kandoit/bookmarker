@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X, Loader2, Plus, Sparkles, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,20 +11,34 @@ interface Props {
   workspaces: Workspace[]
   openaiKey: string
   defaultWorkspaceId?: string
+  initialUrl?: string
   onSave: (bookmarks: Bookmark[], workspaceIds: string[]) => void
 }
 
 export default function AddBookmarkModal({
-  open, onClose, workspaces, openaiKey, defaultWorkspaceId, onSave,
+  open, onClose, workspaces, openaiKey, defaultWorkspaceId, initialUrl, onSave,
 }: Props) {
   const [urls, setUrls] = useState('')
   const [loading, setLoading] = useState(false)
+  const autoAnalyzed = useRef(false)
   const [previews, setPreviews] = useState<Bookmark[]>([])
   const [selectedWsIds, setSelectedWsIds] = useState<Set<string>>(
     () => new Set(defaultWorkspaceId ? [defaultWorkspaceId] : [])
   )
   const [suggestingWs, setSuggestingWs] = useState(false)
   const [wsSuggested, setWsSuggested] = useState(false)
+
+  useEffect(() => {
+    if (open && initialUrl && !autoAnalyzed.current) {
+      autoAnalyzed.current = true
+      setUrls(initialUrl)
+      setPreviews([])
+      setWsSuggested(false)
+      // kick off analysis after state has settled
+      setTimeout(() => handleAnalyzeUrl(initialUrl), 0)
+    }
+    if (!open) autoAnalyzed.current = false
+  }, [open, initialUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
     setUrls('')
@@ -33,8 +47,9 @@ export default function AddBookmarkModal({
     setWsSuggested(false)
   }
 
-  const handleAnalyze = async () => {
-    const list = urls.split('\n').map(u => u.trim()).filter(Boolean)
+  const handleAnalyzeUrl = async (urlOverride?: string) => {
+    const raw = urlOverride ?? urls
+    const list = raw.split('\n').map(u => u.trim()).filter(Boolean)
     if (!list.length) return
     setLoading(true)
     try {
@@ -120,7 +135,7 @@ export default function AddBookmarkModal({
             {/* Analyze button */}
             {!previews.length && (
               <button
-                onClick={handleAnalyze}
+                onClick={() => handleAnalyzeUrl()}
                 disabled={loading || !urls.trim()}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900 font-medium text-sm transition-colors disabled:opacity-50"
               >
