@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import type { Bookmark } from '@bookmarker/shared'
@@ -10,10 +10,19 @@ interface Props {
 }
 
 export default function EditBookmarkModal({ bookmark, onSave, onClose }: Props) {
-  const [title, setTitle] = useState(bookmark?.title ?? '')
-  const [url, setUrl] = useState(bookmark?.url ?? '')
-  const [description, setDescription] = useState(bookmark?.description ?? '')
-  const [tagsRaw, setTagsRaw] = useState(bookmark?.tags.join(', ') ?? '')
+  const [title, setTitle] = useState('')
+  const [url, setUrl] = useState('')
+  const [description, setDescription] = useState('')
+  const [tagsRaw, setTagsRaw] = useState('')
+
+  useEffect(() => {
+    if (bookmark) {
+      setTitle(bookmark.title)
+      setUrl(bookmark.url)
+      setDescription(bookmark.description ?? '')
+      setTagsRaw(bookmark.tags.join(', '))
+    }
+  }, [bookmark])
 
   if (!bookmark) return null
 
