@@ -2,7 +2,7 @@ name: Deploy Web App to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/ai-bookmark-manager-PAtYT]
   workflow_dispatch:
 
 permissions:
