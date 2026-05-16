@@ -26,10 +26,10 @@ export default function BookmarksPage() {
   }, [bookmarks, query, aiResults])
 
   const handleAiSearch = async () => {
-    if (!query || !settings.anthropicApiKey) return
+    if (!query || !settings.openaiApiKey) return
     setAiLoading(true)
     try {
-      const results = await searchBookmarks(query, bookmarks, settings.anthropicApiKey)
+      const results = await searchBookmarks(query, bookmarks, settings.openaiApiKey)
       setAiResults(results)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'AI search failed')
@@ -106,7 +106,7 @@ export default function BookmarksPage() {
             </button>
           )}
         </div>
-        {settings.anthropicApiKey && query && (
+        {settings.openaiApiKey && query && (
           <button
             onClick={handleAiSearch}
             disabled={aiLoading}
@@ -166,7 +166,7 @@ export default function BookmarksPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         workspaces={workspaces}
-        anthropicKey={settings.anthropicApiKey}
+        openaiKey={settings.openaiApiKey}
         onSave={handleSave}
       />
     </div>

@@ -172,7 +172,7 @@ export default function WorkspaceDetailPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         workspaces={workspaces}
-        anthropicKey={settings.anthropicApiKey}
+        openaiKey={settings.openaiApiKey}
         onSave={handleSave}
       />
     </div>

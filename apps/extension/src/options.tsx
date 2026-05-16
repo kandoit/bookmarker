@@ -11,7 +11,7 @@ const defaultSettings: Settings = {
   githubOwner: '',
   githubRepo: '',
   githubBranch: 'main',
-  anthropicApiKey: '',
+  openaiApiKey: '',
   webAppUrl: '',
 }
 
@@ -124,7 +124,7 @@ function Options() {
           </div>
         </div>
 
-        {/* Anthropic */}
+        {/* OpenAI */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Key size={16} className="text-slate-600" />
@@ -132,8 +132,8 @@ function Options() {
             <span className="text-xs text-slate-400">(optional)</span>
           </div>
           <div>
-            <label className={labelCls}>Anthropic API Key</label>
-            <input type="password" value={form.anthropicApiKey} onChange={e => update('anthropicApiKey', e.target.value)} placeholder="sk-ant-xxxxxxxxxxxx" className={inputCls} />
+            <label className={labelCls}>OpenAI API Key</label>
+            <input type="password" value={form.openaiApiKey} onChange={e => update('openaiApiKey', e.target.value)} placeholder="sk-xxxxxxxxxxxx" className={inputCls} />
           </div>
         </div>
 

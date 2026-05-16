@@ -60,7 +60,7 @@ export default function ChatPage() {
 
   const send = async () => {
     const text = input.trim()
-    if (!text || streaming || !settings.anthropicApiKey) return
+    if (!text || streaming || !settings.openaiApiKey) return
 
     const userMsg: ChatMessage = { id: uuid(), role: 'user', content: text }
     const assistantMsg: ChatMessage = { id: uuid(), role: 'assistant', content: '' }
@@ -71,7 +71,7 @@ export default function ChatPage() {
 
     try {
       const allMessages = [...messages, userMsg]
-      for await (const chunk of streamChat(allMessages, bookmarks, settings.anthropicApiKey)) {
+      for await (const chunk of streamChat(allMessages, bookmarks, settings.openaiApiKey)) {
         setMessages(prev =>
           prev.map(m => m.id === assistantMsg.id ? { ...m, content: m.content + chunk } : m)
         )
@@ -96,7 +96,7 @@ export default function ChatPage() {
     }
   }
 
-  if (!settings.anthropicApiKey) {
+  if (!settings.openaiApiKey) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center text-slate-400 dark:text-slate-500 p-8 max-w-sm">

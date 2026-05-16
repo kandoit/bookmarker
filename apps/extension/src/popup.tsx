@@ -132,8 +132,8 @@ function Popup() {
       const pageContent = tab.id ? await getPageContent(tab.id) : ''
       let info = { title: tab.title ?? '', description: '', tags: [] as string[] }
 
-      if (settings.anthropicApiKey) {
-        const ai = await analyzeUrl(tab.url, pageContent, settings.anthropicApiKey)
+      if (settings.openaiApiKey) {
+        const ai = await analyzeUrl(tab.url, pageContent, settings.openaiApiKey)
         info = { title: ai.title || tab.title || tab.url, description: ai.description, tags: ai.tags }
       }
 
@@ -261,9 +261,9 @@ function Popup() {
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? (
-                <><Loader2 size={14} className="animate-spin" /> {settings?.anthropicApiKey ? 'Analyzing…' : 'Saving…'}</>
+                <><Loader2 size={14} className="animate-spin" /> {settings?.openaiApiKey ? 'Analyzing…' : 'Saving…'}</>
               ) : (
-                <>{settings?.anthropicApiKey ? <><Sparkles size={14} /> Save with AI</> : 'Save bookmark'}</>
+                <>{settings?.openaiApiKey ? <><Sparkles size={14} /> Save with AI</> : 'Save bookmark'}</>
               )}
             </button>
           )}

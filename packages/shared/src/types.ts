@@ -22,7 +22,7 @@ export interface Settings {
   githubOwner: string
   githubRepo: string
   githubBranch: string
-  anthropicApiKey: string
+  openaiApiKey: string
   webAppUrl: string
 }
 

@@ -9,11 +9,11 @@ interface Props {
   open: boolean
   onClose: () => void
   workspaces: Workspace[]
-  anthropicKey: string
+  openaiKey: string
   onSave: (bookmarks: Bookmark[], workspaceId?: string) => void
 }
 
-export default function AddBookmarkModal({ open, onClose, workspaces, anthropicKey, onSave }: Props) {
+export default function AddBookmarkModal({ open, onClose, workspaces, openaiKey, onSave }: Props) {
   const [urls, setUrls] = useState('')
   const [workspaceId, setWorkspaceId] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,8 +26,8 @@ export default function AddBookmarkModal({ open, onClose, workspaces, anthropicK
     try {
       const results = await Promise.all(
         list.map(async url => {
-          if (anthropicKey) {
-            const info = await analyzeUrl(url, null, anthropicKey)
+          if (openaiKey) {
+            const info = await analyzeUrl(url, null, openaiKey)
             return createBookmark({
               url,
               title: info.title || url,
@@ -123,7 +123,7 @@ export default function AddBookmarkModal({ open, onClose, workspaces, anthropicK
                 {loading ? (
                   <><Loader2 size={16} className="animate-spin" /> Analyzing with AI...</>
                 ) : (
-                  <><Sparkles size={16} /> {anthropicKey ? 'Analyze with AI' : 'Continue'}</>
+                  <><Sparkles size={16} /> {openaiKey ? 'Analyze with AI' : 'Continue'}</>
                 )}
               </button>
             )}

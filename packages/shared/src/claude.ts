@@ -1,10 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import type { Bookmark, AIBookmarkInfo, ChatMessage } from './types'
 
-const MODEL = 'claude-sonnet-4-6'
+const FAST_MODEL = 'gpt-4o-mini'
+const CHAT_MODEL = 'gpt-4o'
 
 export function createClient(apiKey: string) {
-  return new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  return new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 }
 
 export async function analyzeUrl(
@@ -18,9 +19,10 @@ export async function analyzeUrl(
     ? `\nPage content excerpt:\n${pageContent.slice(0, 4000)}`
     : '\n(No page content available — use your training knowledge about this URL.)'
 
-  const msg = await client.messages.create({
-    model: MODEL,
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
     max_tokens: 512,
+    response_format: { type: 'json_object' },
     messages: [
       {
         role: 'user',
@@ -28,7 +30,7 @@ export async function analyzeUrl(
 
 URL: ${url}${contentSection}
 
-Respond with ONLY a JSON object (no markdown):
+Respond with ONLY a JSON object:
 {
   "title": "Page title (concise)",
   "description": "2-3 sentence summary of what this page is and why it's useful",
@@ -39,9 +41,7 @@ Respond with ONLY a JSON object (no markdown):
   })
 
   try {
-    const text = (msg.content[0] as { text: string }).text.trim()
-    const json = text.startsWith('{') ? text : text.match(/\{[\s\S]+\}/)?.[0] ?? '{}'
-    const parsed = JSON.parse(json)
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
     return {
       title: parsed.title ?? '',
       description: parsed.description ?? '',
@@ -64,9 +64,10 @@ export async function searchBookmarks(
     .map(b => `[${b.id}] "${b.title}" - ${b.url}\n  ${b.description}\n  tags: ${b.tags.join(', ')}`)
     .join('\n\n')
 
-  const msg = await client.messages.create({
-    model: MODEL,
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
     max_tokens: 1024,
+    response_format: { type: 'json_object' },
     messages: [
       {
         role: 'user',
@@ -77,18 +78,15 @@ Query: "${query}"
 Available bookmarks:
 ${list}
 
-Return a JSON array of the top 5 most relevant matches (fewer if not enough relevant ones):
-[{"id": "bookmark-id", "reason": "one sentence why this matches"}]
-
-Return ONLY the JSON array, no markdown.`,
+Return a JSON object with a "results" array of the top 5 most relevant matches:
+{"results": [{"id": "bookmark-id", "reason": "one sentence why this matches"}]}`,
       },
     ],
   })
 
   try {
-    const text = (msg.content[0] as { text: string }).text.trim()
-    const json = text.startsWith('[') ? text : text.match(/\[[\s\S]+\]/)?.[0] ?? '[]'
-    const results: { id: string; reason: string }[] = JSON.parse(json)
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
+    const results: { id: string; reason: string }[] = parsed.results ?? []
     return results
       .map(r => ({
         bookmark: bookmarks.find(b => b.id === r.id)!,
@@ -122,19 +120,18 @@ When referencing a bookmark in your response, include its ID in this format: [[B
 Be concise and helpful.`
     : `You are an AI assistant for a personal bookmark manager. The user has no bookmarks yet. Encourage them to add some.`
 
-  const stream = client.messages.stream({
-    model: MODEL,
+  const stream = await client.chat.completions.create({
+    model: CHAT_MODEL,
     max_tokens: 2048,
-    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    stream: true,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+    ],
   })
 
-  for await (const event of stream) {
-    if (
-      event.type === 'content_block_delta' &&
-      event.delta.type === 'text_delta'
-    ) {
-      yield event.delta.text
-    }
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content ?? ''
+    if (text) yield text
   }
 }
