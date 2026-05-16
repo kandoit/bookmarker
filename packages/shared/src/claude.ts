@@ -98,24 +98,41 @@ Return a JSON object with a "results" array of the top 5 most relevant matches:
   }
 }
 
+export async function fetchPageContent(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      headers: { Accept: 'text/plain' },
+    })
+    if (!res.ok) return null
+    const text = await res.text()
+    return text.slice(0, 8000)
+  } catch {
+    return null
+  }
+}
+
 function buildSystemPrompt(bookmarks: Bookmark[]): string {
   const bookmarkList = bookmarks
     .map(b => `[${b.id}] "${b.title}" (${b.url})\n  ${b.description}\n  tags: ${b.tags.join(', ')}`)
     .join('\n\n')
 
+  const rules = `RULES (follow strictly):
+1. When the user shares any URL (http:// or https://), call add_bookmark immediately — never just describe it.
+2. The add_bookmark tool fetches the real page to extract title, description, and tags automatically.
+3. When the user mentions a website or page by name without a URL, ask them to paste the URL so you can save it.
+4. When the user wants to find bookmarks, call search_bookmarks with their keywords.
+5. After saving a bookmark, reference it as [[BOOKMARK:id]] so the UI renders a clickable card.`
+
   return bookmarks.length
     ? `You are an AI assistant for a personal bookmark manager.
 
-You can search existing bookmarks and add new ones using your tools.
-When a user shares a URL, use add_bookmark to save it automatically — don't just describe it.
-When a user asks to search for bookmarks, use search_bookmarks to find relevant ones and present the results clearly.
-When referencing a saved bookmark in text, write [[BOOKMARK:id]] and the UI renders it as a card.
-Be concise and action-oriented.
+${rules}
 
 Saved bookmarks (${bookmarks.length}):
 ${bookmarkList}`
     : `You are an AI assistant for a personal bookmark manager. The user has no bookmarks yet.
-When they share a URL, use the add_bookmark tool to save it.`
+
+${rules}`
 }
 
 export async function* streamChat(

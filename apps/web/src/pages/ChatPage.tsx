@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Sparkles, BookmarkIcon, Loader2, CheckCircle2, AlertCircle, Plus } from 'lucide-react'
-import { streamChat, analyzeUrl, searchBookmarks, createBookmark, addBookmark, addBookmarkToWorkspace, getFavicon } from '@bookmarker/shared'
+import { streamChat, analyzeUrl, searchBookmarks, fetchPageContent, createBookmark, addBookmark, addBookmarkToWorkspace, getFavicon } from '@bookmarker/shared'
 import type { ChatMessage, Bookmark, AgentTool, StreamEvent } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { useSync } from '../hooks/useSync'
@@ -201,11 +201,11 @@ export default function ChatPage() {
   const buildTools = useCallback((): AgentTool[] => [
     {
       name: 'add_bookmark',
-      description: 'Analyze a URL and save it as a bookmark. Use this whenever the user shares a URL they want bookmarked.',
+      description: 'Fetch a URL\'s real page content, analyze it, and save it as a bookmark. Call this immediately whenever the user shares a URL — do not describe the URL, save it.',
       parameters: {
         type: 'object',
         properties: {
-          url: { type: 'string', description: 'The URL to bookmark' },
+          url: { type: 'string', description: 'The full URL to fetch and bookmark (must start with http:// or https://)' },
           workspace_id: { type: 'string', description: 'Optional workspace ID to assign the bookmark to' },
         },
         required: ['url'],
@@ -214,8 +214,11 @@ export default function ChatPage() {
         const url = args.url as string
         const workspaceId = args.workspace_id as string | undefined
 
+        // Fetch real page content for accurate title/description/tags
+        const pageContent = await fetchPageContent(url)
+
         const info = settings.openaiApiKey
-          ? await analyzeUrl(url, null, settings.openaiApiKey)
+          ? await analyzeUrl(url, pageContent, settings.openaiApiKey)
           : { title: url, description: '', tags: [] }
 
         const bookmark = createBookmark({
@@ -493,7 +496,7 @@ export default function ChatPage() {
 function toolLabel(name: string, args: Record<string, unknown>): string {
   if (name === 'add_bookmark') {
     const url = args.url as string
-    try { return `Saving ${new URL(url).hostname}…` } catch { return 'Saving bookmark…' }
+    try { return `Fetching & saving ${new URL(url).hostname}…` } catch { return 'Fetching page…' }
   }
   if (name === 'search_bookmarks') {
     const q = args.query as string
