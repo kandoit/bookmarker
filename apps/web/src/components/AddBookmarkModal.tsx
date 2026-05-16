@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { X, Loader2, Plus, Sparkles, CheckSquare, Square, ClipboardPaste, ClipboardCheck } from 'lucide-react'
+import { X, Loader2, Plus, Sparkles, CheckSquare, Square, ClipboardPaste, ClipboardCheck, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { analyzeUrl, createBookmark, getFavicon, suggestWorkspacesForBookmark } from '@bookmarker/shared'
 import type { Bookmark, Workspace } from '@bookmarker/shared'
@@ -15,6 +15,11 @@ interface Props {
   onSave: (bookmarks: Bookmark[], workspaceIds: string[]) => void
 }
 
+interface EditState {
+  title: string
+  tagsRaw: string
+}
+
 export default function AddBookmarkModal({
   open, onClose, workspaces, openaiKey, defaultWorkspaceId, initialUrl, onSave,
 }: Props) {
@@ -22,6 +27,7 @@ export default function AddBookmarkModal({
   const [loading, setLoading] = useState(false)
   const autoAnalyzed = useRef(false)
   const [previews, setPreviews] = useState<Bookmark[]>([])
+  const [edits, setEdits] = useState<Record<string, EditState>>({})
   const [selectedWsIds, setSelectedWsIds] = useState<Set<string>>(
     () => new Set(defaultWorkspaceId ? [defaultWorkspaceId] : [])
   )
@@ -35,6 +41,7 @@ export default function AddBookmarkModal({
     autoAnalyzed.current = true
     setUrls(initialUrl)
     setPreviews([])
+    setEdits({})
     setWsSuggested(false)
     setFromClipboard(false)
     setTimeout(() => handleAnalyzeUrl(initialUrl), 0)
@@ -47,6 +54,7 @@ export default function AddBookmarkModal({
       if (/^https?:\/\//i.test(trimmed)) {
         setUrls(trimmed)
         setPreviews([])
+        setEdits({})
         setWsSuggested(false)
         setFromClipboard(true)
         setTimeout(() => handleAnalyzeUrl(trimmed), 0)
@@ -64,6 +72,7 @@ export default function AddBookmarkModal({
       e.preventDefault()
       setUrls(pasted)
       setPreviews([])
+      setEdits({})
       setWsSuggested(false)
       setFromClipboard(true)
       setTimeout(() => handleAnalyzeUrl(pasted), 0)
@@ -73,9 +82,17 @@ export default function AddBookmarkModal({
   const reset = () => {
     setUrls('')
     setPreviews([])
+    setEdits({})
     setSelectedWsIds(new Set(defaultWorkspaceId ? [defaultWorkspaceId] : []))
     setWsSuggested(false)
     setFromClipboard(false)
+  }
+
+  const applyPreviews = (results: Bookmark[]) => {
+    setPreviews(results)
+    setEdits(Object.fromEntries(
+      results.map(b => [b.id, { title: b.title, tagsRaw: b.tags.join(', ') }])
+    ))
   }
 
   const handleAnalyzeUrl = async (urlOverride?: string) => {
@@ -93,9 +110,8 @@ export default function AddBookmarkModal({
           return createBookmark({ url, title: url, description: '', tags: [], favicon: getFavicon(url) })
         })
       )
-      setPreviews(results)
+      applyPreviews(results)
 
-      // Auto-suggest workspaces based on the first bookmark
       if (openaiKey && workspaces.length && results.length) {
         setSuggestingWs(true)
         try {
@@ -116,6 +132,10 @@ export default function AddBookmarkModal({
     }
   }
 
+  const updateEdit = (id: string, field: keyof EditState, value: string) => {
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
+  }
+
   const toggleWs = (id: string) => {
     setSelectedWsIds(prev => {
       const next = new Set(prev)
@@ -127,7 +147,13 @@ export default function AddBookmarkModal({
 
   const handleSave = () => {
     if (!previews.length) return
-    onSave(previews, [...selectedWsIds])
+    const finalBookmarks = previews.map(b => {
+      const e = edits[b.id]
+      return e
+        ? { ...b, title: e.title.trim() || b.title, tags: e.tagsRaw.split(',').map(t => t.trim()).filter(Boolean) }
+        : b
+    })
+    onSave(finalBookmarks, [...selectedWsIds])
     reset()
     onClose()
   }
@@ -170,10 +196,10 @@ export default function AddBookmarkModal({
               </div>
               <textarea
                 value={urls}
-                onChange={e => { setUrls(e.target.value); setPreviews([]); setWsSuggested(false); setFromClipboard(false) }}
+                onChange={e => { setUrls(e.target.value); setPreviews([]); setEdits({}); setWsSuggested(false); setFromClipboard(false) }}
                 onPaste={handlePasteEvent}
                 placeholder="https://example.com&#10;https://another.com"
-                rows={4}
+                rows={3}
                 className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
               />
             </div>
@@ -192,31 +218,53 @@ export default function AddBookmarkModal({
               </button>
             )}
 
-            {/* Preview */}
+            {/* Editable preview cards */}
             {previews.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Preview ({previews.length})
-                </p>
-                {previews.map(b => (
-                  <div key={b.id} className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                    <div className="font-medium text-sm text-slate-900 dark:text-white mb-0.5">{b.title}</div>
-                    <div className="text-xs text-slate-400 mb-1 truncate">{b.url}</div>
-                    {b.description && <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{b.description}</p>}
-                    {b.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {b.tags.map(t => (
-                          <span key={t} className="px-1.5 py-0.5 rounded text-xs bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300">{t}</span>
-                        ))}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Preview ({previews.length})
+                  </p>
+                  <button
+                    onClick={() => { setPreviews([]); setEdits({}) }}
+                    className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  >
+                    Edit URLs
+                  </button>
+                </div>
+                {previews.map(b => {
+                  const e = edits[b.id] ?? { title: b.title, tagsRaw: b.tags.join(', ') }
+                  return (
+                    <div key={b.id} className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 space-y-2">
+                      <div className="text-xs text-slate-400 truncate">{b.url}</div>
+                      {b.description && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{b.description}</p>
+                      )}
+                      {/* Editable title */}
+                      <input
+                        value={e.title}
+                        onChange={ev => updateEdit(b.id, 'title', ev.target.value)}
+                        placeholder="Title"
+                        className="w-full px-2 py-1.5 text-sm font-medium border border-slate-200 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                      {/* Editable tags */}
+                      <div className="flex items-center gap-1.5">
+                        <Tag size={11} className="shrink-0 text-slate-400" />
+                        <input
+                          value={e.tagsRaw}
+                          onChange={ev => updateEdit(b.id, 'tagsRaw', ev.target.value)}
+                          placeholder="tag1, tag2, tag3"
+                          className="flex-1 px-2 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        />
                       </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  )
+                })}
               </div>
             )}
 
-            {/* Workspace selector — shown after preview */}
-            {previews.length > 0 && workspaces.length > 0 && (
+            {/* Workspace selector — always shown when workspaces exist */}
+            {workspaces.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide flex-1">
