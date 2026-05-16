@@ -7,15 +7,30 @@ interface Props {
   bookmarkCount: number
   onDelete: (id: string) => void
   onOpenAll: (id: string) => void
+  selectable?: boolean
+  selected?: boolean
+  onSelect?: (id: string) => void
 }
 
-export default function WorkspaceCard({ workspace, bookmarkCount, onDelete, onOpenAll }: Props) {
+export default function WorkspaceCard({ workspace, bookmarkCount, onDelete, onOpenAll, selectable, selected, onSelect }: Props) {
   const lastOpened = workspace.lastOpenedAt
     ? new Date(workspace.lastOpenedAt).toLocaleDateString()
     : null
 
   return (
-    <div className="group bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:shadow-md dark:hover:shadow-slate-900/50 transition-all">
+    <div
+      onClick={selectable ? () => onSelect?.(workspace.id) : undefined}
+      className={`group relative bg-white dark:bg-slate-800 border rounded-xl p-5 hover:shadow-md dark:hover:shadow-slate-900/50 transition-all
+        ${selectable ? 'cursor-pointer' : ''}
+        ${selected ? 'border-violet-400 dark:border-violet-500 ring-2 ring-violet-200 dark:ring-violet-900' : 'border-slate-200 dark:border-slate-700'}
+      `}
+    >
+      {selectable && (
+        <div className={`absolute top-3 right-3 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
+          ${selected ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}`}>
+          {selected && <svg viewBox="0 0 10 8" className="w-2.5 h-2 text-white" fill="currentColor"><path d="M1 4l3 3 5-6"/></svg>}
+        </div>
+      )}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-violet-100 dark:bg-violet-950 flex items-center justify-center">

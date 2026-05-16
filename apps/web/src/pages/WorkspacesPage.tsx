@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Plus, X, Sparkles, Loader2, CheckSquare, Square } from 'lucide-react'
+import { Plus, X, Sparkles, Loader2, CheckSquare, Square, Download, FileDown } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { toast } from 'sonner'
-import { createWorkspace, addWorkspace, deleteWorkspace, updateWorkspace, addBookmarkToWorkspace, suggestWorkspaceBookmarks } from '@bookmarker/shared'
+import { createWorkspace, addWorkspace, deleteWorkspace, updateWorkspace, addBookmarkToWorkspace, suggestWorkspaceBookmarks, exportBookmarksHTML } from '@bookmarker/shared'
 import type { Bookmark } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { useSync } from '../hooks/useSync'
@@ -21,6 +21,27 @@ export default function WorkspacesPage() {
   const [description, setDescription] = useState('')
   const [suggesting, setSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+
+  // Selection + export
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  const exitSelect = () => { setSelectMode(false); setSelectedIds(new Set()) }
+
+  const doExport = (wsIds?: string[]) => {
+    const html = exportBookmarksHTML(bookmarks, workspaces, wsIds ? { workspaceIds: wsIds } : {})
+    const blob = new Blob([html], { type: 'text/html' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `workspaces-${new Date().toISOString().slice(0, 10)}.html`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    toast.success('Workspaces exported')
+    exitSelect()
+  }
 
   const resetModal = () => {
     setName('')
@@ -92,18 +113,54 @@ export default function WorkspacesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Workspaces</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Group bookmarks by project or task
-          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Group bookmarks by project or task</p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          New workspace
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => selectMode ? doExport([...selectedIds]) : setSelectMode(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Download size={14} />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            <span className="hidden sm:inline">New workspace</span>
+            <span className="sm:hidden">New</span>
+          </button>
+        </div>
       </div>
+
+      {/* Select mode bar */}
+      {selectMode && (
+        <div className="flex items-center justify-between mb-4 px-4 py-2.5 rounded-xl bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => selectedIds.size === workspaces.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(workspaces.map(w => w.id)))}
+              className="text-sm text-violet-700 dark:text-violet-300 hover:underline"
+            >
+              {selectedIds.size === workspaces.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <span className="text-sm text-violet-600 dark:text-violet-400">{selectedIds.size} selected</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => doExport(selectedIds.size ? [...selectedIds] : undefined)}
+              disabled={selectedIds.size === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-600 hover:bg-violet-700 text-white transition-colors disabled:opacity-40"
+            >
+              <FileDown size={14} />
+              Export {selectedIds.size > 0 ? `(${selectedIds.size})` : 'all'}
+            </button>
+            <button onClick={exitSelect} className="p-1.5 rounded-lg text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-900">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {workspaces.length === 0 ? (
         <div className="text-center py-20 text-slate-400 dark:text-slate-500">
@@ -118,6 +175,9 @@ export default function WorkspacesPage() {
               bookmarkCount={ws.bookmarkIds.length}
               onDelete={handleDelete}
               onOpenAll={handleOpenAll}
+              selectable={selectMode}
+              selected={selectedIds.has(ws.id)}
+              onSelect={toggleSelect}
             />
           ))}
         </div>

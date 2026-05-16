@@ -7,9 +7,12 @@ interface Props {
   workspaces: Workspace[]
   onDelete: (id: string) => void
   onAddToWorkspace: (bookmarkId: string, workspaceId: string) => void
+  selectable?: boolean
+  selected?: boolean
+  onSelect?: (id: string) => void
 }
 
-export default function BookmarkCard({ bookmark, workspaces, onDelete, onAddToWorkspace }: Props) {
+export default function BookmarkCard({ bookmark, workspaces, onDelete, onAddToWorkspace, selectable, selected, onSelect }: Props) {
   const [showActions, setShowActions] = useState(false)
   const [showWsMenu, setShowWsMenu] = useState(false)
 
@@ -20,12 +23,21 @@ export default function BookmarkCard({ bookmark, workspaces, onDelete, onAddToWo
 
   return (
     <div
-      className="group relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 hover:shadow-md dark:hover:shadow-slate-900/50 transition-all"
-      onMouseEnter={() => setShowActions(true)}
+      className={`group relative bg-white dark:bg-slate-800 border rounded-xl p-4 hover:shadow-md dark:hover:shadow-slate-900/50 transition-all cursor-pointer
+        ${selected ? 'border-violet-400 dark:border-violet-500 ring-2 ring-violet-200 dark:ring-violet-900' : 'border-slate-200 dark:border-slate-700'}
+      `}
+      onClick={selectable ? () => onSelect?.(bookmark.id) : undefined}
+      onMouseEnter={() => !selectable && setShowActions(true)}
       onMouseLeave={() => { setShowActions(false); setShowWsMenu(false) }}
     >
+      {selectable && (
+        <div className={`absolute top-3 left-3 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
+          ${selected ? 'bg-violet-600 border-violet-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}`}>
+          {selected && <svg viewBox="0 0 10 8" className="w-2.5 h-2 text-white" fill="currentColor"><path d="M1 4l3 3 5-6"/></svg>}
+        </div>
+      )}
       {/* Header */}
-      <div className="flex items-start gap-3 mb-2">
+      <div className={`flex items-start gap-3 mb-2 ${selectable ? 'pl-6' : ''}`}>
         {bookmark.favicon && (
           <img
             src={bookmark.favicon}
