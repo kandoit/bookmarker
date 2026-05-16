@@ -5,6 +5,22 @@ import type { BookmarkData, WorkspaceData } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { logger } from '../logger'
 
+const NETWORK_ERRORS = ['load failed', 'failed to fetch', 'network request failed', 'networkerror']
+const isNetworkError = (e: unknown) =>
+  e instanceof Error && NETWORK_ERRORS.some(s => e.message.toLowerCase().includes(s))
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 1500): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    if (retries > 0 && isNetworkError(e)) {
+      await new Promise(r => setTimeout(r, delayMs))
+      return withRetry(fn, retries - 1, delayMs * 2)
+    }
+    throw e
+  }
+}
+
 export function useSync() {
   const { settings, sync, setBookmarks, setWorkspaces, setSync, setSyncing, setSyncError } = useStore()
   const pendingRef = useRef<{ bookmarks?: BookmarkData; workspaces?: WorkspaceData }>({})
@@ -27,7 +43,7 @@ export function useSync() {
     setSyncError(null)
     try {
       const storage = getStorage()
-      const { bookmarks, workspaces, meta } = await storage.fetchAll()
+      const { bookmarks, workspaces, meta } = await withRetry(() => storage.fetchAll())
       setBookmarks(bookmarks.items)
       setWorkspaces(workspaces.items)
       setSync(meta)
@@ -70,8 +86,8 @@ export function useSync() {
         pendingRef.current = {}
         setSyncing(true)
         try {
-          if (b) await pushBookmarks(b)
-          if (w) await pushWorkspaces(w)
+          if (b) await withRetry(() => pushBookmarks(b))
+          if (w) await withRetry(() => pushWorkspaces(w))
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Push failed'
           logger.error('Storage push failed', msg)
