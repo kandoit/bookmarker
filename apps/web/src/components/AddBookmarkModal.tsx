@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { X, Loader2, Plus, Sparkles, CheckSquare, Square, ClipboardPaste } from 'lucide-react'
+import { X, Loader2, Plus, Sparkles, CheckSquare, Square, ClipboardPaste, ClipboardCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { analyzeUrl, createBookmark, getFavicon, suggestWorkspacesForBookmark } from '@bookmarker/shared'
 import type { Bookmark, Workspace } from '@bookmarker/shared'
@@ -31,31 +31,44 @@ export default function AddBookmarkModal({
 
   useEffect(() => {
     if (!open) { autoAnalyzed.current = false; return }
-    if (autoAnalyzed.current) return
+    if (autoAnalyzed.current || !initialUrl) return
+    autoAnalyzed.current = true
+    setUrls(initialUrl)
+    setPreviews([])
+    setWsSuggested(false)
+    setFromClipboard(false)
+    setTimeout(() => handleAnalyzeUrl(initialUrl), 0)
+  }, [open, initialUrl]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (initialUrl) {
-      autoAnalyzed.current = true
-      setUrls(initialUrl)
-      setPreviews([])
-      setWsSuggested(false)
-      setFromClipboard(false)
-      setTimeout(() => handleAnalyzeUrl(initialUrl), 0)
-      return
-    }
-
-    // Try clipboard for a URL
-    navigator.clipboard.readText().then(text => {
+  const handlePasteButton = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
       const trimmed = text.trim()
-      if (/^https?:\/\//i.test(trimmed) && !autoAnalyzed.current) {
-        autoAnalyzed.current = true
+      if (/^https?:\/\//i.test(trimmed)) {
         setUrls(trimmed)
         setPreviews([])
         setWsSuggested(false)
         setFromClipboard(true)
         setTimeout(() => handleAnalyzeUrl(trimmed), 0)
+      } else {
+        toast.error('No URL found in clipboard')
       }
-    }).catch(() => { /* clipboard permission denied — silent */ })
-  }, [open, initialUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+    } catch {
+      toast.error('Clipboard access denied')
+    }
+  }
+
+  const handlePasteEvent = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = e.clipboardData.getData('text').trim()
+    if (/^https?:\/\//i.test(pasted)) {
+      e.preventDefault()
+      setUrls(pasted)
+      setPreviews([])
+      setWsSuggested(false)
+      setFromClipboard(true)
+      setTimeout(() => handleAnalyzeUrl(pasted), 0)
+    }
+  }
 
   const reset = () => {
     setUrls('')
@@ -142,15 +155,23 @@ export default function AddBookmarkModal({
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   URLs <span className="text-slate-400 font-normal">(one per line)</span>
                 </label>
-                {fromClipboard && (
+                {fromClipboard ? (
                   <span className="flex items-center gap-1 text-xs text-violet-500 dark:text-violet-400">
-                    <ClipboardPaste size={12} /> Pasted from clipboard
+                    <ClipboardCheck size={12} /> From clipboard
                   </span>
+                ) : (
+                  <button
+                    onClick={handlePasteButton}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <ClipboardPaste size={12} /> Paste URL
+                  </button>
                 )}
               </div>
               <textarea
                 value={urls}
                 onChange={e => { setUrls(e.target.value); setPreviews([]); setWsSuggested(false); setFromClipboard(false) }}
+                onPaste={handlePasteEvent}
                 placeholder="https://example.com&#10;https://another.com"
                 rows={4}
                 className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
