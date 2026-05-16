@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Sparkles, BookmarkIcon, Loader2, CheckCircle2, AlertCircle, Plus } from 'lucide-react'
-import { streamChat, analyzeUrl, searchBookmarks, fetchPageContent, createBookmark, addBookmark, addBookmarkToWorkspace, getFavicon } from '@bookmarker/shared'
+import { streamChat, analyzeUrl, searchBookmarks, suggestNewBookmarks, fetchPageContent, createBookmark, addBookmark, addBookmarkToWorkspace, getFavicon } from '@bookmarker/shared'
 import type { ChatMessage, Bookmark, AgentTool, StreamEvent } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { useSync } from '../hooks/useSync'
@@ -314,6 +314,51 @@ export default function ChatPage() {
         }))
       ),
     },
+    {
+      name: 'suggest_bookmarks',
+      description: 'Suggest new bookmarks the user might enjoy based on their existing collection. Call this when the user asks for recommendations, suggestions, or wants to discover new resources.',
+      parameters: {
+        type: 'object',
+        properties: {
+          message_id: { type: 'string', description: 'Internal message ID (provided by the system)' },
+        },
+      },
+      execute: async (args) => {
+        const msgId = args.message_id as string | undefined
+
+        if (!bookmarksRef.current.length) {
+          return JSON.stringify({ message: 'No bookmarks yet — save some first so I can learn your interests.' })
+        }
+
+        const suggestions = settings.openaiApiKey
+          ? await suggestNewBookmarks(bookmarksRef.current, settings.openaiApiKey)
+          : []
+
+        if (!suggestions.length) {
+          return JSON.stringify({ message: 'Could not generate suggestions right now.' })
+        }
+
+        const results: SearchResult[] = suggestions.map(s => ({
+          bookmark: createBookmark({
+            url: s.url,
+            title: s.title,
+            description: s.description,
+            tags: s.tags,
+            favicon: getFavicon(s.url),
+          }),
+          reason: s.reason,
+        }))
+
+        if (msgId) {
+          setMessages(prev => prev.map(m =>
+            m.id === msgId ? { ...m, searchResults: results } : m
+          ))
+        }
+
+        logger.info('Bookmark suggestions generated', { count: results.length })
+        return JSON.stringify({ suggestions: suggestions.map(s => ({ title: s.title, url: s.url })) })
+      },
+    },
   ], [settings.openaiApiKey, setBookmarks, setWorkspaces, schedulePush])
 
   // ── Send ──────────────────────────────────────────────────────────────────
@@ -337,9 +382,9 @@ export default function ChatPage() {
       const history = [...chatHistory, userChatMsg]
       const tools = buildTools()
 
-      // Inject assistant message ID so search_bookmarks can attach results to it
+      // Inject assistant message ID so result-card tools can attach results to the right message
       const toolsWithId = tools.map(t =>
-        t.name === 'search_bookmarks'
+        t.name === 'search_bookmarks' || t.name === 'suggest_bookmarks'
           ? {
               ...t,
               execute: (args: Record<string, unknown>) =>
@@ -437,8 +482,8 @@ export default function ChatPage() {
             <p className="font-medium mb-2">Ask about your bookmarks or share a URL</p>
             <div className="text-xs space-y-1 max-w-xs mx-auto">
               <p className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">"Add https://react.dev to my bookmarks"</p>
-              <p className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">"Find me something about TypeScript"</p>
               <p className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">"Search for CSS animation tools"</p>
+              <p className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">"Suggest new bookmarks I'd like"</p>
             </div>
           </div>
         )}
@@ -508,6 +553,7 @@ function toolLabel(name: string, args: Record<string, unknown>): string {
     const q = args.query as string
     return `Searching for "${q}"…`
   }
+  if (name === 'suggest_bookmarks') return 'Finding suggestions for you…'
   if (name === 'list_workspaces') return 'Checking workspaces…'
   return `Running ${name}…`
 }

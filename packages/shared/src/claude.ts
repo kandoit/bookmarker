@@ -155,6 +155,53 @@ export async function fetchPageContent(url: string): Promise<string | null> {
   }
 }
 
+export async function suggestNewBookmarks(
+  bookmarks: Bookmark[],
+  apiKey: string
+): Promise<{ title: string; url: string; description: string; tags: string[]; reason: string }[]> {
+  if (!bookmarks.length) return []
+  const client = createClient(apiKey)
+
+  const interests = bookmarks
+    .slice(0, 40)
+    .map(b => `"${b.title}" — tags: ${b.tags.join(', ')}`)
+    .join('\n')
+  const existingUrls = bookmarks.map(b => b.url).join('\n')
+
+  const response = await client.chat.completions.create({
+    model: FAST_MODEL,
+    max_tokens: 1024,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'user',
+        content: `Based on a user's bookmarks, suggest 6 new resources they would likely enjoy that they don't already have.
+
+User's bookmarks:
+${interests}
+
+Already saved URLs — do NOT suggest any of these:
+${existingUrls}
+
+Requirements:
+- Only suggest real, well-known, high-quality resources with working URLs
+- Diversify across their interest areas
+- Each suggestion must be something genuinely useful, not generic
+
+Return ONLY JSON:
+{"suggestions": [{"title": "...", "url": "https://...", "description": "2-3 sentence summary", "tags": ["tag1", "tag2"], "reason": "one sentence why this fits their interests"}]}`,
+      },
+    ],
+  })
+
+  try {
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}')
+    return Array.isArray(parsed.suggestions) ? parsed.suggestions : []
+  } catch {
+    return []
+  }
+}
+
 function buildSystemPrompt(bookmarks: Bookmark[]): string {
   const bookmarkList = bookmarks
     .map(b => `[${b.id}] "${b.title}" (${b.url})\n  ${b.description}\n  tags: ${b.tags.join(', ')}`)
@@ -165,7 +212,8 @@ function buildSystemPrompt(bookmarks: Bookmark[]): string {
 2. The add_bookmark tool fetches the real page to extract title, description, and tags automatically.
 3. When the user mentions a website or page by name without a URL, ask them to paste the URL so you can save it.
 4. When the user wants to find bookmarks, call search_bookmarks with their keywords.
-5. After saving a bookmark, reference it as [[BOOKMARK:id]] so the UI renders a clickable card.`
+5. When the user asks for recommendations or new suggestions, call suggest_bookmarks.
+6. After saving a bookmark, reference it as [[BOOKMARK:id]] so the UI renders a clickable card.`
 
   return bookmarks.length
     ? `You are an AI assistant for a personal bookmark manager.
