@@ -1,16 +1,21 @@
 import { useState, useMemo, useRef } from 'react'
-import { Plus, Search, Sparkles, X, Download, Upload, FileDown } from 'lucide-react'
+import { Plus, Search, Sparkles, X, Download, Upload, FileDown, Trash2, Tag } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { toast } from 'sonner'
 import {
-  addBookmark, deleteBookmark, addBookmarkToWorkspace, textSearch, searchBookmarks,
-  exportBookmarksHTML, parseNetscapeHTML, createBookmark, createWorkspace, addWorkspace, getFavicon,
+  addBookmark, deleteBookmark, updateBookmark, addBookmarkToWorkspace,
+  removeBookmarkFromWorkspace, textSearch, searchBookmarks,
+  exportBookmarksHTML, parseNetscapeHTML, createBookmark, createWorkspace,
+  addWorkspace, getFavicon,
 } from '@bookmarker/shared'
 import type { Bookmark, ParsedBookmarkFile } from '@bookmarker/shared'
 import { useStore } from '../store'
 import { useSync } from '../hooks/useSync'
 import BookmarkCard from '../components/BookmarkCard'
 import AddBookmarkModal from '../components/AddBookmarkModal'
+import EditBookmarkModal from '../components/EditBookmarkModal'
+
+type SortKey = 'newest' | 'oldest' | 'az' | 'za'
 
 export default function BookmarksPage() {
   const { bookmarks, workspaces, settings } = useStore()
@@ -20,8 +25,13 @@ export default function BookmarksPage() {
 
   const [query, setQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Bookmark | null>(null)
   const [aiResults, setAiResults] = useState<{ bookmark: Bookmark; reason: string }[] | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+
+  // Sort + tag filter
+  const [sortBy, setSortBy] = useState<SortKey>('newest')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
 
   // Selection
   const [selectMode, setSelectMode] = useState(false)
@@ -32,11 +42,35 @@ export default function BookmarksPage() {
   const [importData, setImportData] = useState<ParsedBookmarkFile | null>(null)
   const [importWithFolders, setImportWithFolders] = useState(true)
 
+  // Top tags by frequency
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>()
+    bookmarks.forEach(b => b.tags.forEach(t => counts.set(t, (counts.get(t) ?? 0) + 1)))
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([tag]) => tag)
+  }, [bookmarks])
+
   const displayed = useMemo(() => {
-    if (aiResults) return aiResults.map(r => r.bookmark)
-    if (!query) return bookmarks
-    return textSearch(bookmarks, query)
-  }, [bookmarks, query, aiResults])
+    let list: Bookmark[]
+
+    if (aiResults) {
+      list = aiResults.map(r => r.bookmark)
+    } else {
+      list = query ? textSearch(bookmarks, query) : [...bookmarks]
+    }
+
+    if (activeTag) list = list.filter(b => b.tags.includes(activeTag))
+
+    if (!aiResults) {
+      switch (sortBy) {
+        case 'oldest': list = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt)); break
+        case 'az': list = [...list].sort((a, b) => (a.title || a.url).localeCompare(b.title || b.url)); break
+        case 'za': list = [...list].sort((a, b) => (b.title || b.url).localeCompare(a.title || a.url)); break
+        default: break // newest first (addBookmark prepends)
+      }
+    }
+
+    return list
+  }, [bookmarks, query, aiResults, sortBy, activeTag])
 
   const handleAiSearch = async () => {
     if (!query || !settings.openaiApiKey) return
@@ -67,6 +101,14 @@ export default function BookmarksPage() {
     schedulePush(bData, wData)
     const wsNames = workspaceIds.map(id => workspaces.find(w => w.id === id)?.name).filter(Boolean)
     toast.success(`${newBookmarks.length} bookmark${newBookmarks.length > 1 ? 's' : ''} saved${wsNames.length ? ` → ${wsNames.join(', ')}` : ''}`)
+  }
+
+  const handleEdit = (id: string, updates: Partial<Bookmark>) => {
+    const bData = updateBookmark({ version: 1, updatedAt: '', items: bookmarks }, id, updates)
+    setBookmarks(bData.items)
+    schedulePush(bData)
+    setEditTarget(null)
+    toast.success('Bookmark updated')
   }
 
   const handleDelete = (id: string) => {
@@ -101,6 +143,26 @@ export default function BookmarksPage() {
   }
 
   const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()) }
+
+  const handleBulkDelete = () => {
+    const count = selectedIds.size
+    let bData = { version: 1, updatedAt: '', items: bookmarks }
+    for (const id of selectedIds) bData = deleteBookmark(bData, id)
+
+    // Remove from all workspaces too
+    let wData = { version: 1, updatedAt: '', items: workspaces }
+    for (const id of selectedIds) {
+      for (const ws of workspaces) {
+        if (ws.bookmarkIds.includes(id)) wData = removeBookmarkFromWorkspace(wData, ws.id, id)
+      }
+    }
+
+    setBookmarks(bData.items)
+    setWorkspaces(wData.items)
+    schedulePush(bData, wData)
+    toast.success(`${count} bookmark${count > 1 ? 's' : ''} deleted`)
+    exitSelectMode()
+  }
 
   // ── Export ───────────────────────────────────────────────────────────────────
 
@@ -141,14 +203,12 @@ export default function BookmarksPage() {
 
     const allImported: Bookmark[] = []
 
-    // Top-level bookmarks
     for (const ib of importData.bookmarks) {
       const b = createBookmark({ url: ib.url, title: ib.title, description: ib.description, tags: ib.tags, favicon: getFavicon(ib.url) })
       bData = addBookmark(bData, b)
       allImported.push(b)
     }
 
-    // Folders → workspaces
     if (importWithFolders) {
       for (const folder of importData.folders) {
         const folderBookmarks: Bookmark[] = []
@@ -163,7 +223,6 @@ export default function BookmarksPage() {
         for (const b of folderBookmarks) wData = addBookmarkToWorkspace(wData, ws.id, b.id)
       }
     } else {
-      // Flatten folder bookmarks into top level
       for (const folder of importData.folders) {
         for (const ib of folder.bookmarks) {
           const b = createBookmark({ url: ib.url, title: ib.title, description: ib.description, tags: ib.tags, favicon: getFavicon(ib.url) })
@@ -193,7 +252,6 @@ export default function BookmarksPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{bookmarks.length} saved</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Import */}
           <button
             onClick={() => fileInputRef.current?.click()}
             title="Import from browser HTML"
@@ -204,7 +262,6 @@ export default function BookmarksPage() {
           </button>
           <input ref={fileInputRef} type="file" accept=".html,.htm" className="hidden" onChange={handleFileChange} />
 
-          {/* Export */}
           <button
             onClick={() => selectMode ? doExport([...selectedIds]) : setSelectMode(true)}
             title="Export bookmarks"
@@ -232,11 +289,17 @@ export default function BookmarksPage() {
             <button onClick={toggleSelectAll} className="text-sm text-violet-700 dark:text-violet-300 hover:underline">
               {selectedIds.size === displayed.length ? 'Deselect all' : 'Select all'}
             </button>
-            <span className="text-sm text-violet-600 dark:text-violet-400">
-              {selectedIds.size} selected
-            </span>
+            <span className="text-sm text-violet-600 dark:text-violet-400">{selectedIds.size} selected</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-40"
+            >
+              <Trash2 size={14} />
+              Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+            </button>
             <button
               onClick={() => doExport(selectedIds.size ? [...selectedIds] : undefined)}
               disabled={selectedIds.size === 0}
@@ -252,8 +315,8 @@ export default function BookmarksPage() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="flex gap-2 mb-6">
+      {/* Search + sort row */}
+      <div className="flex gap-2 mb-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -279,7 +342,45 @@ export default function BookmarksPage() {
             AI search
           </button>
         )}
+        {!aiResults && (
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortKey)}
+            className="px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="az">A → Z</option>
+            <option value="za">Z → A</option>
+          </select>
+        )}
       </div>
+
+      {/* Tag filter chips */}
+      {allTags.length > 0 && !aiResults && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {activeTag && (
+            <button
+              onClick={() => setActiveTag(null)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-violet-600 text-white"
+            >
+              <Tag size={10} />
+              {activeTag}
+              <X size={10} />
+            </button>
+          )}
+          {allTags.filter(t => t !== activeTag).map(tag => (
+            <button
+              key={tag}
+              onClick={() => setActiveTag(tag)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-violet-100 dark:hover:bg-violet-900 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+            >
+              <Tag size={10} />
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* AI result header */}
       {aiResults && (
@@ -305,7 +406,7 @@ export default function BookmarksPage() {
       {/* Grid */}
       {displayed.length === 0 ? (
         <div className="text-center py-20 text-slate-400 dark:text-slate-500">
-          {query ? 'No bookmarks match your search' : 'No bookmarks yet — add your first one!'}
+          {activeTag ? `No bookmarks tagged "${activeTag}"` : query ? 'No bookmarks match your search' : 'No bookmarks yet — add your first one!'}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -315,7 +416,9 @@ export default function BookmarksPage() {
               bookmark={b}
               workspaces={workspaces}
               onDelete={handleDelete}
+              onEdit={setEditTarget}
               onAddToWorkspace={handleAddToWorkspace}
+              onTagClick={tag => { setActiveTag(tag); clearSearch() }}
               selectable={selectMode}
               selected={selectedIds.has(b.id)}
               onSelect={toggleSelect}
@@ -330,6 +433,12 @@ export default function BookmarksPage() {
         workspaces={workspaces}
         openaiKey={settings.openaiApiKey}
         onSave={handleSave}
+      />
+
+      <EditBookmarkModal
+        bookmark={editTarget}
+        onSave={handleEdit}
+        onClose={() => setEditTarget(null)}
       />
 
       {/* Import preview dialog */}

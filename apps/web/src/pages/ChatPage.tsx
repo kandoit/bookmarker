@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Sparkles, BookmarkIcon, Loader2, CheckCircle2, AlertCircle, Plus } from 'lucide-react'
+import { Send, Sparkles, BookmarkIcon, Loader2, CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react'
 import { streamChat, analyzeUrl, searchBookmarks, suggestNewBookmarks, fetchPageContent, createBookmark, addBookmark, addBookmarkToWorkspace, getFavicon } from '@bookmarker/shared'
 import type { ChatMessage, Bookmark, AgentTool, StreamEvent } from '@bookmarker/shared'
+import { toast } from 'sonner'
 import { useStore } from '../store'
 import { useSync } from '../hooks/useSync'
 import { logger } from '../logger'
@@ -161,6 +162,8 @@ function MessageBubble({
   )
 }
 
+const CHAT_STORAGE_KEY = 'bookmarker-chat'
+
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
@@ -179,6 +182,33 @@ export default function ChatPage() {
   const workspacesRef = useRef(workspaces)
   bookmarksRef.current = bookmarks
   workspacesRef.current = workspaces
+
+  // Load persisted chat on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_STORAGE_KEY)
+      if (saved) {
+        const { messages: m, history: h } = JSON.parse(saved)
+        if (Array.isArray(m)) setMessages(m)
+        if (Array.isArray(h)) setChatHistory(h)
+      }
+    } catch { /* ignore corrupted data */ }
+  }, [])
+
+  // Persist chat whenever it changes
+  useEffect(() => {
+    if (messages.length === 0 && chatHistory.length === 0) return
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({ messages, history: chatHistory }))
+    } catch { /* storage full */ }
+  }, [messages, chatHistory])
+
+  const clearChat = () => {
+    setMessages([])
+    setChatHistory([])
+    localStorage.removeItem(CHAT_STORAGE_KEY)
+    toast.success('Chat cleared')
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -471,6 +501,16 @@ export default function ChatPage() {
           <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">
             {bookmarks.length} bookmarks · paste a URL to save it
           </span>
+          {messages.length > 0 && (
+            <button
+              onClick={clearChat}
+              disabled={streaming}
+              title="Clear chat history"
+              className="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
       </div>
 
